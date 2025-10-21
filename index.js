@@ -18,6 +18,15 @@ const checks = [
   // literal_mismatch
 ]
 
+const DSN = require('haraka-dsn')
+DSN.helo_not_ascii = () =>
+  DSN.create(
+    501,
+    'HELO/EHLO argument invalid - HELO hostname contains non-ASCII characters (RFC 5321 2.3.5), closing connection',
+    5,
+    4,
+  )
+
 exports.register = function () {
   this.load_helo_checks_ini()
 
@@ -171,6 +180,15 @@ exports.valid_hostname = function (next, connection, helo) {
         DENY,
         'HELO host must be a FQDN or address literal (RFC 5321 2.3.5)',
       )
+    }
+    return next()
+  }
+
+  // Check whether the HELO hostname is a valid ASCII string
+  if (!/[\x20-\x7E]+/.test(helo)) {
+    connection.results.add(this, { fail: 'valid_hostname(not_ascii)' })
+    if (this.cfg.reject.valid_hostname) {
+      return next(DENY, DSN.helo_not_ascii())
     }
     return next()
   }
